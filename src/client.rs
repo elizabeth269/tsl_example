@@ -1,33 +1,69 @@
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio_rustls::rustls::{self, ClientConfig};
+use tokio_rustls::rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
 
-#[tokio::main]
-async fn main() {
-    // Configure TLS settings
-    let mut config = ClientConfig::builder()
-        .with_safe_defaults()
-        .with_root_certificates(rustls::RootCertStore::empty())
-        .with_no_client_auth();
-    config
-        .root_store
-        .add_server_trust_anchors(&TLS_SERVER_ROOTS);
+pub struct TlsClient {
+    addr: String,
+    domain: String,
+}
 
-    let connector = TlsConnector::from(Arc::new(config));
+impl TlsClient {
+    pub fn new(addr: &str, domain: &str) -> Self {
+        TlsClient {
+            addr: addr.to_string(),
+            domain: domain.to_string(),
+        }
+    }
 
-    // Connect to the server
-    let stream = TcpStream::connect("127.0.0.1:8080").await.unwrap();
-    let domain = rustls::ServerName::try_from("localhost").unwrap();
-    let mut stream = connector.connect(domain, stream).await.unwrap();
+    pub async fn run(&self) -> std::io::Result<()> {
+        // let mut root_store = RootCertStore::empty();
+        // root_store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
+        let root_store =
+            rustls::RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
-    // Send a message to the server
-    stream.write_all(b"Hello, server!").await.unwrap();
+        // let config = ClientConfig::builder()
+        //     .with_safe_defaults()
+        //     .with_root_certificates(root_store)
+        //     .with_no_client_auth();
+        let config = rustls::ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
 
-    // Read the response from the server
-    let mut buf = [0; 1024];
-    let n = stream.read(&mut buf).await.unwrap();
-    println!("Received: {}", String::from_utf8_lossy(&buf[0..n]));
+        let connector = TlsConnector::from(Arc::new(config));
+        let stream = TcpStream::connect(&self.addr).await?;
+        let domain = ServerName::try_from(self.domain.as_str()).unwrap();
+        let mut stream = connector.connect(domain, stream).await.unwrap();
+
+        stream.write_all(b"Hello, server!").await.unwrap();
+        let mut buf = [0; 1024];
+        let n = stream.read(&mut buf).await.unwrap();
+        println!("Received: {}", String::from_utf8_lossy(&buf[0..n]));
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::task;
+
+    #[tokio::test]
+    async fn test_client_creation() {
+        let client = TlsClient::new("127.0.0.1:8081", "localhost");
+
+        // Attempt to run the client
+        let client_task = task::spawn(async move {
+            client.run().await.unwrap();
+        });
+
+        // Give the client a moment to attempt connection
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        // Shutdown the client
+        client_task.abort();
+    }
 }
