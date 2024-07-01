@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::sync::mpsc::error;
 use tokio_rustls::rustls::{pki_types::ServerName, ClientConfig, RootCertStore};
 use tokio_rustls::TlsConnector;
 use webpki_roots::TLS_SERVER_ROOTS;
@@ -18,7 +19,7 @@ impl TlsClient {
         }
     }
 
-    pub async fn run(&self) -> std::io::Result<()> {
+    pub async fn run(&self) -> std::io::Result<(rustls::ClientConnection, rustls::Error)> {
         // let mut root_store = RootCertStore::empty();
         // root_store.add_server_trust_anchors(&TLS_SERVER_ROOTS);
         let root_store =
@@ -32,17 +33,21 @@ impl TlsClient {
             .with_root_certificates(root_store)
             .with_no_client_auth();
 
-        let connector = TlsConnector::from(Arc::new(config));
-        let stream = TcpStream::connect(&self.addr).await?;
-        let domain = ServerName::try_from(self.domain.as_str()).unwrap();
-        let mut stream = connector.connect(domain, stream).await.unwrap();
+        // let connector = TlsConnector::from(Arc::new(config));
+        // let stream = TcpStream::connect(&self.addr).await?;
+        // let domain = ServerName::try_from(self.domain.as_str()).unwrap();
+        // let mut stream = connector.connect(domain, stream).await.unwrap();
 
-        stream.write_all(b"Hello, server!").await.unwrap();
+        let rc_config = Arc::new(config);
+        let domain = ServerName::try_from(self.domain.as_str()).unwrap();
+        let mut stream = rustls::ClientConnection::new(rc_config, domain);
+
+        stream.write_al(b"Hello, server!").await.unwrap();
         let mut buf = [0; 1024];
         let n = stream.read(&mut buf).await.unwrap();
         println!("Received: {}", String::from_utf8_lossy(&buf[0..n]));
 
-        Ok(())
+        Ok()
     }
 }
 
