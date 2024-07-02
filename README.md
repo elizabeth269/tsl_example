@@ -26,7 +26,7 @@ openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pe
 
 #### Running the Server and Client
 
-Clone the repository: git clone https://github.com/elizabethadebayo269/tls_example.git
+Clone the repository: git clone https://github.com/elizabeth269/tls_example.git
 cd tls_example
 
 Build and run the project: cargo run
