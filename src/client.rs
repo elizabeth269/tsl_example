@@ -42,7 +42,7 @@ impl TlsClient {
         let domain = ServerName::try_from(self.domain.as_str()).unwrap();
         let mut stream = rustls::ClientConnection::new(rc_config, domain);
 
-        stream.write_al(b"Hello, server!").await.unwrap();
+        stream.write_all(b"Hello, server!").await.unwrap();
         let mut buf = [0; 1024];
         let n = stream.read(&mut buf).await.unwrap();
         println!("Received: {}", String::from_utf8_lossy(&buf[0..n]));
