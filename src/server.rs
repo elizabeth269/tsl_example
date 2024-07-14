@@ -27,7 +27,7 @@ impl TlsServer {
         let certs = load_certs(&self.cert_path)?;
         let key = load_private_key(&self.key_path)?;
         let config = ServerConfig::builder()
-            .with_safe_defaults()
+            /*.with_safe_defaults()*/
             .with_no_client_auth()
             .with_single_cert(certs, key)
             .unwrap();
